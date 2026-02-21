@@ -14,7 +14,8 @@ cp .env.example .env
 
 Edit `.env` and set:
 
-- `BESTBUY_API_KEY` – from [developer.bestbuy.com](https://developer.bestbuy.com/) (use the **Developer API** key, not Company Keys). If the product returns 404, the fetcher will try a search fallback; the app continues with Apple Refurbished only.
+- `BESTBUY_API_KEY` – optional; from [developer.bestbuy.com](https://developer.bestbuy.com/). API keys may require approval.
+- `BESTBUY_USE_SCRAPING` – set to `true` to scrape Best Buy with Playwright when no API key or API fails (no approval needed).
 - `TARGET_PRICE_USD` – e.g. 1999
 - `SMTP_USER`, `SMTP_PASS` – Gmail App Password
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` – optional, for push notifications
@@ -65,13 +66,20 @@ python -m src.main
 - Gmail: use an [App Password](https://support.google.com/accounts/answer/185833), not your main password.
 - Telegram: create a bot with [@BotFather](https://t.me/BotFather) and get your chat ID from [@userinfobot](https://t.me/userinfobot).
 
+## Best Buy: API vs scraping
+
+| Mode | Requirements | Notes |
+|------|--------------|-------|
+| API | `BESTBUY_API_KEY` | Requires approval from Best Buy; may take time. |
+| Scraping | `BESTBUY_USE_SCRAPING=true` | Uses requests to fetch HTML and extract price. No Playwright needed. Best Buy may block in some networks. |
+
 ## Project structure
 
 ```
 hot-sale-scrapper/
 ├── src/
 │   ├── main.py          # Entry + scheduler
-│   ├── fetchers/        # Best Buy API, Apple refurbished
+│   ├── fetchers/        # Best Buy (API + optional Playwright scraping), Apple refurbished
 │   ├── models.py        # Product, PriceRecord
 │   ├── storage.py       # SQLite persistence
 │   ├── comparator.py    # Threshold logic
