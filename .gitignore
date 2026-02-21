@@ -134,6 +134,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Local data
+data/
+
 # Environments
 .env
 .envrc
@@ -205,3 +208,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.example
