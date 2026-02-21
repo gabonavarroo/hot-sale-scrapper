@@ -76,7 +76,7 @@ def run_check() -> None:
             if send_telegram_alert(product, target_price):
                 logger.info("📱 Telegram sent")
             else:
-                logger.debug("Telegram not sent — check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
+                logger.warning("Telegram not sent — check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
         elif is_new_low and target_price > 0:
             logger.info(
                 "New price low: $%.2f (still above target $%.2f)",

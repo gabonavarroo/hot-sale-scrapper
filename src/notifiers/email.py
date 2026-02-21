@@ -1,11 +1,14 @@
 """Email notification via SMTP (Gmail)."""
 
+import logging
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from src.models import Product
+
+logger = logging.getLogger(__name__)
 
 
 def send_email_alert(product: Product, target_price: float) -> bool:
@@ -20,6 +23,7 @@ def send_email_alert(product: Product, target_price: float) -> bool:
     to_addr = os.environ.get("SMTP_TO", user)
 
     if not user or not password:
+        logger.warning("Email: SMTP_USER or SMTP_PASS not set")
         return False
 
     subject = f"Price Alert: {product.name[:50]}... at ${product.price:,.2f}"
@@ -43,10 +47,19 @@ Get it before it's gone!
     msg.attach(MIMEText(body.strip(), "plain"))
 
     try:
+        logger.debug("Email: sending alert to %s", to_addr)
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
             server.login(user, password)
             server.sendmail(user, to_addr, msg.as_string())
+        logger.info("Email: alert sent successfully")
         return True
-    except Exception:
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error("Email authentication failed: %s", e)
+        return False
+    except smtplib.SMTPException as e:
+        logger.error("Email SMTP error: %s", e)
+        return False
+    except Exception as e:
+        logger.error("Email unexpected error: %s", e, exc_info=True)
         return False

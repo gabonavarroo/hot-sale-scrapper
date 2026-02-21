@@ -13,23 +13,23 @@ def _matches_target(name: str) -> bool:
     """Check if product name matches our target MacBook Pro M4 Pro spec."""
     name_lower = name.lower()
     # Must be 14" MacBook Pro
-    if "14" not in name or "macbook pro" not in name_lower:
+    if "14-inch" not in name or "macbook pro" not in name_lower:
         return False
     # M4 Pro
-    if "m4 pro" not in name_lower and "m4 pro chip" not in name_lower:
-        return False
-    # 12-core CPU
-    if "12" not in name and "12‑core" not in name and "12-core" not in name_lower:
-        return False
-    # 16-core GPU
-    if "16" not in name and "16‑core" not in name and "16-core" not in name_lower:
-        return False
+    # if "m4 pro" not in name_lower and "m4 pro chip" not in name_lower:
+    #     return False
+    # # 12-core CPU
+    # if "12" not in name and "12‑core" not in name and "12-core" not in name_lower:
+    #     return False
+    # # 16-core GPU
+    # if "16" not in name and "16‑core" not in name and "16-core" not in name_lower:
+    #     return False
     # 512GB
-    if "512" not in name:
-        return False
+    # if "512" not in name:
+    #     return False
     # Space Black
-    if "space black" not in name_lower and "space black" not in name_lower:
-        return False
+    # if "space black" not in name_lower and "space black" not in name_lower:
+    #     return False
     return True
 
 
