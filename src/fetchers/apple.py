@@ -16,8 +16,8 @@ def _matches_target(name: str) -> bool:
     if "14-inch" not in name or "macbook pro" not in name_lower:
         return False
     # M4 Pro
-    # if "m4 pro" not in name_lower and "m4 pro chip" not in name_lower:
-    #     return False
+    if "m4" not in name_lower: #and "m4 pro chip" not in name_lower:
+        return False
     # # 12-core CPU
     # if "12" not in name and "12‑core" not in name and "12-core" not in name_lower:
     #     return False

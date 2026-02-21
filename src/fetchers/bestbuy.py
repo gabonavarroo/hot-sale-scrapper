@@ -37,7 +37,7 @@ DEFAULT_PRODUCT_URL = (
     "JJGCQ8HVWL"
 )
 BESTBUY_API_BASE = "https://api.bestbuy.com/v1"
-ZIP_CODES = ["10001", "90210", "60601", "77001", "85001", "30301", "98101"]
+ZIP_CODES = [ "77001", "85001", "30301", "10001", "90210", "60601", "98101"]
 
 PRICE_PATTERNS = [
     r'"salePrice"\s*:\s*([\d.]+)',
