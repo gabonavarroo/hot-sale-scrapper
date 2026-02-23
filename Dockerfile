@@ -1,19 +1,18 @@
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+FROM python:3.11-slim
 
 WORKDIR /app
 
+# Copiamos e instalamos dependencias
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download Camoufox browser (patched Firefox for anti-detect scraping).
-# Only runs if BESTBUY_USE_CAMOUFOX=true at runtime; having it pre-downloaded
-# avoids a slow first-run download inside the container.
-RUN python -m camoufox fetch || true
-
+# Copiamos el código fuente
 COPY src/ ./src/
 COPY .env.example .env.example
 
+# Variables de entorno por defecto
 ENV PYTHONPATH=/app
 ENV DB_PATH=/app/data/prices.db
 
+# Comando de inicio
 CMD ["python", "-m", "src.main"]
