@@ -40,6 +40,7 @@ BESTBUY_API_BASE = "https://api.bestbuy.com/v1"
 ZIP_CODES = [ "77001", "85001", "30301", "10001", "90210", "60601", "98101"]
 
 PRICE_PATTERNS = [
+    r'"customerPrice"\s*:\s*([\d\.]+)',
     r'"salePrice"\s*:\s*([\d.]+)',
     r'"currentPrice"\s*:\s*([\d.]+)',
     r'"customerPrice"\s*:\s*([\d.]+)',
@@ -56,7 +57,7 @@ def _sku() -> str:
 
 
 def _product_url() -> str:
-    return os.environ.get("BESTBUY_PRODUCT_URL", DEFAULT_PRODUCT_URL)
+    return "https://www.bestbuy.com/product/apple-macbook-pro-14-inch-laptop-apple-m4-pro-chip-built-for-apple-intelligence-24gb-memory-512gb-ssd-space-black/JJGCQ8HVWL"
 
 
 def _parse_price(text: str) -> float | None:
@@ -187,6 +188,110 @@ def _fetch_via_curl_cffi(sku: str) -> Product | None:
     logger.debug("curl_cffi: precio no encontrado en HTML (%d chars)", len(html))
     return None
 
+# def _fetch_via_scraperapi(sku: str) -> Product | None:
+#     api_key = os.environ.get("SCRAPERAPI_KEY")
+#     if not api_key:
+#         logger.error("SCRAPERAPI_KEY no configurada en el archivo .env")
+#         return None
+
+#     target_url = _product_url()
+    
+#     # Vamos a usar la configuración exacta que usa el dashboard por defecto
+#     payload = {
+#         'api_key': api_key,
+#         'url': target_url,
+#         'country_code': 'us',
+#         'device_type': 'desktop'
+#         # Nota: Quitamos render=true y premium=true para igualar el test de la web
+#     }
+    
+#     try:
+#         logger.info("Iniciando petición vía ScraperAPI...")
+#         resp = requests.get('https://api.scraperapi.com/', params=payload, timeout=60)
+        
+#         # Si ScraperAPI devuelve un error 500, imprimimos el mensaje exacto
+#         if resp.status_code != 200:
+#             logger.error(f"ScraperAPI falló con código {resp.status_code}: {resp.text}")
+#             return None
+            
+#         html = resp.text
+        
+#         # Intentamos extraer el precio con tus patrones
+#         for pattern in PRICE_PATTERNS:
+#             m = re.search(pattern, html)
+#             if m:
+#                 price = _parse_price(m.group(1))
+#                 if price:
+#                     logger.info("ScraperAPI éxito: $%.2f (patrón: %s)", price, pattern[:40])
+#                     return _make_product(price)
+                    
+#         # SI LLEGA AQUÍ: ScraperAPI funcionó (HTTP 200) pero el Regex falló.
+#         # Guardamos el HTML para que lo puedas abrir y auditar.
+#         debug_file = "scraperapi_debug.html"
+#         with open(debug_file, "w", encoding="utf-8") as f:
+#             f.write(html)
+            
+#         logger.warning(f"⚠️ ScraperAPI cargó la página, pero no encontró el precio. Revisa el archivo '{debug_file}' para ver el código fuente.")
+#         return None
+
+#     except Exception as e:
+#         logger.error("Excepción en petición a ScraperAPI: %s", e)
+        # return None
+
+def _fetch_via_scraperapi(sku: str) -> Product | None:
+    api_key = os.environ.get("SCRAPERAPI_KEY")
+    if not api_key:
+        logger.error("SCRAPERAPI_KEY no configurada en el archivo .env")
+        return None
+
+    #target_url = _product_url()
+    target_url = "https://www.bestbuy.com/product/apple-macbook-pro-14-inch-laptop-apple-m4-pro-chip-built-for-apple-intelligence-24gb-memory-512gb-ssd-space-black/JJGCQ8HVWL"
+
+    # LA FÓRMULA PARA BEST BUY: Premium SÍ (evita bloqueo), Render NO (evita timeout)
+    payload = {
+        'api_key': api_key,
+        'url': target_url,
+        'premium': 'true',      # Usamos 'premium' correctamente escrito
+        'country_code': 'us',
+        'device_type': 'desktop'
+    }
+    
+    try:
+        logger.info("Solicitando a ScraperAPI (Modo Premium residencial)...")
+        # Timeout de 45s es suficiente porque no renderizamos JavaScript
+        resp = requests.get('https://api.scraperapi.com/', params=payload, timeout=60)
+        
+        if resp.status_code != 200:
+            logger.error(f"ScraperAPI falló con código {resp.status_code}: {resp.text}")
+            return None
+            
+        html = resp.text
+        
+        # Guarda el HTML siempre para poder auditarlo si algo falla
+        with open("scraperapi_debug.html", "w", encoding="utf-8") as f:
+            f.write(html)
+        
+        # Agregamos el nuevo patrón "customerPrice" al inicio de la lista
+        patterns = [
+            r'"customerPrice"\s*:\s*([\d\.]+)',
+            r'"salePrice"\s*:\s*([\d\.]+)',
+            r'"price"\s*:\s*([\d\.]+)'
+        ]
+        
+        for pattern in PRICE_PATTERNS:
+            m = re.search(pattern, html)
+            if m:
+                price = _parse_price(m.group(1))
+                if price:
+                    logger.info(f"✅ Éxito! Precio encontrado: ${price:.2f} usando el patrón: {pattern}")
+                    return _make_product(price)
+                    
+        logger.warning("ScraperAPI cargó exitosamente, pero no encontró el precio. Revisa 'scraperapi_debug.html'.")
+        return None
+
+    except Exception as e:
+        logger.error(f"Excepción en la petición a ScraperAPI: {e}")
+        return None
 
 # ── Capa 2: curl_cffi + endpoints JSON internos ────────────────────────────────
 
@@ -255,36 +360,61 @@ def _fetch_via_curl_json(sku: str) -> Product | None:
 
 def fetch_bestbuy_product() -> Product | None:
     """
-    Fetch precio de MacBook Pro 14" M4 Pro de Best Buy.
-
+    Fetch precio de MacBook Pro de Best Buy.
     Orden de estrategias:
-      0. API oficial      — si BESTBUY_API_KEY está configurada
-                            (devuelve MSRP, no descuentos temporales)
-      1. curl_cffi + HTML — precio real con descuento (PRINCIPAL)
-      2. curl_cffi + JSON — endpoints internos como fallback rápido
-
-    curl_cffi bypasea Akamai Bot Manager imitando el TLS fingerprint
-    de Chrome, sin necesidad de VPN ni proxies.
+      0. API oficial      — si BESTBUY_API_KEY está configurada (devuelve MSRP)
+      1. ScraperAPI       — Extrae el precio real con descuento delegando el bypass de Akamai
     """
     sku = _sku()
+    
+    # Capa 0: API oficial de Best Buy (si la tienes configurada)
     api_key = os.environ.get("BESTBUY_API_KEY", "").strip()
-
-    # Capa 0: API oficial (solo para disponibilidad, precio puede ser MSRP)
     if api_key:
         result = _fetch_official_api(api_key, sku)
         if result:
             return result
 
-    # Capa 1: curl_cffi + página (precio real con descuento)
-    result = _fetch_via_curl_cffi(sku)
-    if result:
-        return result
-    logger.warning("curl_cffi página falló, intentando endpoints JSON...")
-
-    # Capa 2: curl_cffi + JSON interno
-    result = _fetch_via_curl_json(sku)
+    # Capa 1: ScraperAPI (PRECIO REAL CON DESCUENTO)
+    result = _fetch_via_scraperapi(sku)
     if result:
         return result
 
-    logger.error("Best Buy: todas las estrategias fallaron")
+    logger.error("Best Buy: Todas las estrategias fallaron.")
     return None
+
+
+# def fetch_bestbuy_product() -> Product | None:
+#     """
+#     Fetch precio de MacBook Pro 14" M4 Pro de Best Buy.
+
+#     Orden de estrategias:
+#       0. API oficial      — si BESTBUY_API_KEY está configurada
+#                             (devuelve MSRP, no descuentos temporales)
+#       1. curl_cffi + HTML — precio real con descuento (PRINCIPAL)
+#       2. curl_cffi + JSON — endpoints internos como fallback rápido
+
+#     curl_cffi bypasea Akamai Bot Manager imitando el TLS fingerprint
+#     de Chrome, sin necesidad de VPN ni proxies.
+#     """
+#     sku = _sku()
+#     api_key = os.environ.get("BESTBUY_API_KEY", "").strip()
+
+#     # Capa 0: API oficial (solo para disponibilidad, precio puede ser MSRP)
+#     if api_key:
+#         result = _fetch_official_api(api_key, sku)
+#         if result:
+#             return result
+
+#     # Capa 1: curl_cffi + página (precio real con descuento)
+#     result = _fetch_via_curl_cffi(sku)
+#     if result:
+#         return result
+#     logger.warning("curl_cffi página falló, intentando endpoints JSON...")
+
+#     # Capa 2: curl_cffi + JSON interno
+#     result = _fetch_via_curl_json(sku)
+#     if result:
+#         return result
+
+#     logger.error("Best Buy: todas las estrategias fallaron")
+#     return None
